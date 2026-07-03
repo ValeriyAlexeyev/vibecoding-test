@@ -1,0 +1,1 @@
+(function theme(){const KEY="goJuniorAcademy.theme";function apply(t){document.documentElement.dataset.theme=t;localStorage.setItem(KEY,t)}window.GoCourse=window.GoCourse||{};window.GoCourse.theme={init(){apply(localStorage.getItem(KEY)||"dark")},toggle(){apply(document.documentElement.dataset.theme==="light"?"dark":"light")}}})();
