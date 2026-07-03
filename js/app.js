@@ -139,6 +139,10 @@
     return `
       <section class="section" id="practice-500">
         <div class="section-heading"><span class="eyebrow">Практика</span><h2>${tasks.length} задач с решениями</h2></div>
+        <div class="section-visual">
+          <img src="assets/images/code-review.svg" alt="Карточки задач и разбор кода">
+          <div><strong>Практика устроена как рабочий журнал</strong><p>Открывайте задачи по одной, сверяйтесь с подсказкой и смотрите решение только после своей попытки.</p></div>
+        </div>
         <div class="task-list">
           ${tasks.map((task) => `
             <details class="task-card">
@@ -158,6 +162,10 @@
     return `
       <section class="section" id="interview-tasks">
         <div class="section-heading"><span class="eyebrow">Собеседования</span><h2>Типичные технические задачи</h2></div>
+        <div class="section-visual compact">
+          <img src="assets/images/code-review.svg" alt="Разбор технического собеседования">
+          <div><strong>Разборы без паники</strong><p>Каждая задача объясняет, что именно проверяет интервьюер и какой ход решения лучше проговорить вслух.</p></div>
+        </div>
         <div class="compact-list">
           ${course.advanced.interviewTasks.map(([title, why, approach]) => `
             <article>
@@ -173,6 +181,10 @@
     return `
       <section class="section" id="real-projects">
         <div class="section-heading"><span class="eyebrow">Мини-проекты</span><h2>${course.advanced.projects.length} реальных проектов</h2></div>
+        <div class="section-visual">
+          <img src="assets/images/project-board.svg" alt="Доска мини-проектов Go">
+          <div><strong>Проекты как портфолио</strong><p>CLI, HTTP, REST, файлы, JSON, тесты и конкурентность собраны так, чтобы из них можно было вырастить GitHub-портфолио.</p></div>
+        </div>
         <div class="project-grid">
           ${course.advanced.projects.map((project) => `
             <article>
@@ -283,7 +295,10 @@
           <p>40 уроков, 320+ примеров кода, 400 вопросов, уровни, достижения, график прогресса, 500+ задач, проекты и чек-лист подготовки к работе.</p>
           <div class="hero-actions"><a class="primary" href="${lastLesson.file}">Продолжить обучение</a><a href="#daily-task">Задание дня</a><a href="#practice-500">500+ задач</a></div>
         </div>
-        <div class="hero-terminal"><div class="dots"><i></i><i></i><i></i></div><pre><code>${highlight('package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, Go!")\n}')}</code></pre></div>
+        <div class="hero-art">
+          <img src="assets/images/programmer-desk.svg" alt="Программист изучает Go за рабочим столом">
+          <div class="hero-terminal"><div class="dots"><i></i><i></i><i></i></div><pre><code>${highlight('package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, Go!")\n}')}</code></pre></div>
+        </div>
       </section>
       <section class="stats-grid">
         ${course.progressCard()}

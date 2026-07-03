@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" role="img" aria-labelledby="title desc">
+  <title id="title">Programmer at desk</title>
+  <desc id="desc">Friendly illustration of a programmer learning Go at a desk.</desc>
+  <rect width="900" height="620" rx="34" fill="#e8f7f1"/>
+  <path d="M70 456h760v70c0 22-18 40-40 40H110c-22 0-40-18-40-40v-70Z" fill="#174c5b"/>
+  <rect x="238" y="140" width="424" height="272" rx="24" fill="#1d2433"/>
+  <rect x="268" y="172" width="364" height="198" rx="14" fill="#102b3a"/>
+  <path d="M318 220h106M318 258h184M318 296h142M500 220h74M500 258h64" stroke="#79d6b5" stroke-width="14" stroke-linecap="round"/>
+  <path d="M318 334h236" stroke="#ffd166" stroke-width="14" stroke-linecap="round"/>
+  <path d="M376 412h148l28 44H348l28-44Z" fill="#2c6b78"/>
+  <circle cx="450" cy="84" r="46" fill="#ffb199"/>
+  <path d="M384 110c22-58 96-70 132-20 22 31 12 70-16 92-16-34-46-52-90-48-15 1-25-7-26-24Z" fill="#174c5b"/>
+  <path d="M232 318c38-82 103-124 194-118 87 5 149 52 184 118l-74 42c-27-43-62-64-105-64-45 0-82 21-111 64l-88-42Z" fill="#4fb3a4"/>
+  <path d="M164 438c44-76 98-116 162-120M736 438c-44-76-98-116-162-120" stroke="#ffb199" stroke-width="28" stroke-linecap="round"/>
+  <rect x="120" y="430" width="224" height="80" rx="18" fill="#ffffff"/>
+  <rect x="556" y="430" width="224" height="80" rx="18" fill="#ffffff"/>
+  <path d="M160 470h128M596 470h128" stroke="#58a6ff" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="744" cy="138" r="34" fill="#ffd166"/>
+  <path d="M716 138h56M744 110v56" stroke="#174c5b" stroke-width="10" stroke-linecap="round"/>
+</svg>

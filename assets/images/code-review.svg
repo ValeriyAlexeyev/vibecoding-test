@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" role="img" aria-labelledby="title desc">
+  <title id="title">Code review</title>
+  <desc id="desc">Programming task cards and code review checklist.</desc>
+  <rect width="900" height="620" rx="34" fill="#fff5df"/>
+  <rect x="92" y="88" width="716" height="444" rx="28" fill="#172033"/>
+  <rect x="132" y="132" width="304" height="330" rx="18" fill="#25324a"/>
+  <rect x="476" y="132" width="292" height="330" rx="18" fill="#25324a"/>
+  <path d="M172 188h104M172 236h192M172 284h142M172 332h210M172 380h166" stroke="#79d6b5" stroke-width="15" stroke-linecap="round"/>
+  <path d="M520 190l34 34 76-82M520 286l34 34 76-82M520 382l34 34 76-82" stroke="#ffd166" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M658 206h64M658 302h64M658 398h64" stroke="#f58f7c" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="116" cy="548" r="38" fill="#4fb3a4"/>
+  <circle cx="784" cy="548" r="38" fill="#58a6ff"/>
+  <path d="M108 548h16M776 548h16" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+  <path d="M116 540v16M784 540v16" stroke="#fff" stroke-width="10" stroke-linecap="round"/>
+</svg>

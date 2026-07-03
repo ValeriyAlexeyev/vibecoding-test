@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" role="img" aria-labelledby="title desc">
+  <title id="title">Project board</title>
+  <desc id="desc">Friendly board with Go mini-project ideas.</desc>
+  <rect width="900" height="620" rx="34" fill="#eaf1ff"/>
+  <rect x="88" y="92" width="724" height="436" rx="30" fill="#172033"/>
+  <rect x="136" y="150" width="168" height="286" rx="18" fill="#263a59"/>
+  <rect x="366" y="150" width="168" height="286" rx="18" fill="#263a59"/>
+  <rect x="596" y="150" width="168" height="286" rx="18" fill="#263a59"/>
+  <path d="M168 198h94M168 246h74M168 294h110M398 198h94M398 246h74M398 294h110M628 198h94M628 246h74M628 294h110" stroke="#ffffff" stroke-opacity=".88" stroke-width="14" stroke-linecap="round"/>
+  <path d="M168 368h94M398 368h94M628 368h94" stroke="#79d6b5" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="220" cy="472" r="42" fill="#4fb3a4"/>
+  <circle cx="450" cy="472" r="42" fill="#ffd166"/>
+  <circle cx="680" cy="472" r="42" fill="#f58f7c"/>
+  <path d="M198 472h44M428 472h44M658 472h44" stroke="#172033" stroke-width="10" stroke-linecap="round"/>
+  <path d="M220 450v44M450 450v44M680 450v44" stroke="#172033" stroke-width="10" stroke-linecap="round"/>
+</svg>
