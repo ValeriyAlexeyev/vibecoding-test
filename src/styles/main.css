@@ -532,6 +532,102 @@ textarea {
   background: white;
 }
 
+.agent-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: 16px;
+}
+
+.agent-card,
+.agent-chat {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 18px;
+}
+
+.agent-avatar {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: white;
+  font-weight: 900;
+  margin-bottom: 12px;
+}
+
+.agent-card p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.agent-facts,
+.agent-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.agent-facts span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--panel);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agent-messages {
+  display: grid;
+  gap: 12px;
+  max-height: 430px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.agent-message {
+  width: min(92%, 760px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--panel);
+}
+
+.agent-message.user {
+  justify-self: end;
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(14, 165, 233, 0.12)), var(--panel);
+}
+
+.agent-message span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agent-message p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.agent-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.agent-form input {
+  min-height: 42px;
+  padding: 0 12px;
+}
+
 @media (max-width: 1100px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -547,6 +643,7 @@ textarea {
   }
 
   .lessons-layout,
+  .agent-layout,
   .editor-grid {
     grid-template-columns: 1fr;
   }
@@ -580,6 +677,10 @@ textarea {
   }
 
   .sidebar nav {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-form {
     grid-template-columns: 1fr;
   }
 }

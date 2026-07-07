@@ -9,6 +9,12 @@ const defaultState = {
   completedLessons: [],
   completedTasks: [],
   quizScores: {},
+  agentMessages: [
+    {
+      role: "agent",
+      text: "Привет! Я локальный AI-агент курса. Могу подобрать следующий урок, объяснить тему, предложить практику или быстро проверить код из мини-редактора."
+    }
+  ],
   code: "",
   theme: "light"
 };
@@ -99,6 +105,17 @@ function App() {
     ),
     practice: <Practice tasks={practiceTasks} completedTasks={state.completedTasks} onToggle={toggleTask} />,
     projects: <Projects projects={miniProjects} />,
+    agent: (
+      <AIAgent
+        messages={state.agentMessages}
+        progress={progress}
+        state={state}
+        selectedLesson={selectedLesson}
+        code={state.code}
+        onMessages={(agentMessages) => updateState({ agentMessages })}
+        onOpenLessons={() => setActiveSection("lessons")}
+      />
+    ),
     tests: <Tests lessons={lessons} scores={state.quizScores} />,
     progress: <Progress state={state} progress={progress} />,
     reference: <Reference items={reference} />,
@@ -144,6 +161,7 @@ function Sidebar({ activeSection, setActiveSection }) {
     ["lessons", "Уроки"],
     ["practice", "Практика"],
     ["projects", "Мини-проекты"],
+    ["agent", "AI-агент"],
     ["tests", "Тесты"],
     ["progress", "Личный прогресс"],
     ["reference", "Справочник"],
@@ -354,6 +372,148 @@ function Projects({ projects }) {
             <ol>{project.steps.map((step) => <li key={step}>{step}</li>)}</ol>
           </article>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function normalizeText(value) {
+  return value.toLowerCase().replace(/ё/g, "е");
+}
+
+function findRelevantLesson(message) {
+  const query = normalizeText(message);
+  return lessons.find((lesson) => {
+    const text = normalizeText(`${lesson.title} ${lesson.description} ${lesson.theory} ${lesson.practice}`);
+    return query.split(/\s+/).filter((word) => word.length > 3).some((word) => text.includes(word));
+  });
+}
+
+function getNextLesson(state) {
+  return lessons.find((lesson) => !state.completedLessons.includes(lesson.id)) || lessons[lessons.length - 1];
+}
+
+function analyzeCode(code) {
+  const source = code.trim();
+  const tips = [];
+
+  if (!source) {
+    return ["Редактор пустой. Начни с простого блока: h1, p и button."];
+  }
+
+  if (!/<h1|<h2|<h3/i.test(source)) tips.push("Добавь заголовок h1-h3, чтобы у страницы была понятная структура.");
+  if (!/<main|<section|<article|<header|<footer/i.test(source)) tips.push("Попробуй семантические теги: main, section, article, header или footer.");
+  if (/<button/i.test(source) && !/addEventListener|onclick/i.test(source)) tips.push("Кнопка есть, но поведения нет. Добавь addEventListener или обработчик onclick.");
+  if (/<img/i.test(source) && !/alt=/i.test(source)) tips.push("У img нужен alt, это базовая доступность.");
+  if (/<style/i.test(source) && !/display:\s*(grid|flex)/i.test(source)) tips.push("Для макета попробуй flex или grid вместо случайных отступов.");
+  if (/localStorage/i.test(source) && !/JSON\.(stringify|parse)/i.test(source)) tips.push("Если сохраняешь объекты в localStorage, используй JSON.stringify и JSON.parse.");
+  if (!tips.length) tips.push("Хорошее начало: структура читается. Следующий шаг - проверь адаптивность и состояния кнопок.");
+
+  return tips;
+}
+
+function generateAgentReply(message, context) {
+  const text = normalizeText(message);
+  const nextLesson = getNextLesson(context.state);
+  const relevantLesson = findRelevantLesson(message) || context.selectedLesson;
+
+  if (text.includes("код") || text.includes("проверь") || text.includes("ошиб")) {
+    return `Проверил код из мини-редактора. ${analyzeCode(context.code).join(" ")} Для закрепления открой урок «${relevantLesson.title}» и сравни свой код с примером.`;
+  }
+
+  if (text.includes("след") || text.includes("что учить") || text.includes("план") || text.includes("маршрут")) {
+    return `Твой прогресс: ${context.progress}%. Следующий разумный шаг - урок «${nextLesson.title}». После него сделай практику: ${nextLesson.practice}`;
+  }
+
+  if (text.includes("практи") || text.includes("задан") || text.includes("проект")) {
+    const task = practiceTasks.find((item) => !context.state.completedTasks.includes(item.title)) || practiceTasks[0];
+    return `Предлагаю практику: «${task.title}». ${task.text} Когда закончишь, отметь задание в разделе «Практика».`;
+  }
+
+  if (text.includes("тест") || text.includes("вопрос")) {
+    return `Начни с теста к уроку «${relevantLesson.title}». В нем ${relevantLesson.quiz.length} вопроса. Если ошибешься, перечитай теорию и пример кода, а потом повтори попытку.`;
+  }
+
+  if (text.includes("html") || text.includes("css") || text.includes("javascript") || text.includes("js") || text.includes("react")) {
+    return `По твоему вопросу ближе всего урок «${relevantLesson.title}». Коротко: ${relevantLesson.description} Практический шаг: ${relevantLesson.practice}`;
+  }
+
+  if (text.includes("senior") || text.includes("синьор") || text.includes("архитект")) {
+    return "Путь до Senior - это не только React. Держи фокус на архитектуре, доступности, производительности, безопасности, тестах и code review. Для тренировки возьми один мини-проект и опиши его требования, риски и критерии качества.";
+  }
+
+  return `Я понял запрос. Мой совет: открой урок «${nextLesson.title}», сделай практику и затем попроси меня проверить код. Я работаю локально и использую только данные этой платформы.`;
+}
+
+function AIAgent({ messages, progress, state, selectedLesson, code, onMessages, onOpenLessons }) {
+  const [draft, setDraft] = useState("");
+  const quickPrompts = [
+    "Что учить дальше?",
+    "Проверь мой код",
+    "Дай практическое задание",
+    "Объясни HTML",
+    "Как расти до Senior?"
+  ];
+
+  function sendMessage(text = draft) {
+    const cleanText = text.trim();
+    if (!cleanText) return;
+
+    const userMessage = { role: "user", text: cleanText };
+    const agentMessage = {
+      role: "agent",
+      text: generateAgentReply(cleanText, { progress, state, selectedLesson, code })
+    };
+    onMessages([...messages, userMessage, agentMessage]);
+    setDraft("");
+  }
+
+  function resetChat() {
+    onMessages(defaultState.agentMessages);
+  }
+
+  return (
+    <section className="section agent-section">
+      <SectionTitle kicker="AI-агент" title="Локальный наставник по веб-разработке" />
+      <div className="agent-layout">
+        <article className="agent-card">
+          <div className="agent-avatar">AI</div>
+          <h3>Что умеет агент</h3>
+          <p>Подбирает следующий урок, объясняет темы курса, предлагает практику и анализирует код из мини-редактора. Все работает в браузере: без платных API, облака и внешней базы.</p>
+          <div className="agent-facts">
+            <span>Локально</span>
+            <span>Без API</span>
+            <span>localStorage</span>
+          </div>
+          <button type="button" onClick={onOpenLessons}>Открыть уроки</button>
+        </article>
+
+        <article className="agent-chat">
+          <div className="agent-messages" aria-live="polite">
+            {messages.map((message, index) => (
+              <div key={`${message.role}-${index}`} className={`agent-message ${message.role}`}>
+                <span>{message.role === "agent" ? "AI-агент" : "Вы"}</span>
+                <p>{message.text}</p>
+              </div>
+            ))}
+          </div>
+          <div className="agent-prompts">
+            {quickPrompts.map((prompt) => (
+              <button key={prompt} type="button" onClick={() => sendMessage(prompt)}>{prompt}</button>
+            ))}
+          </div>
+          <form
+            className="agent-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              sendMessage();
+            }}
+          >
+            <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Спроси: что учить дальше, проверь код, дай практику..." />
+            <button type="submit">Спросить</button>
+            <button type="button" onClick={resetChat}>Очистить</button>
+          </form>
+        </article>
       </div>
     </section>
   );
