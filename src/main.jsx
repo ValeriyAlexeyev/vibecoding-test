@@ -1,25 +1,33 @@
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { finalProjects, lessons, levels, miniProjects, practiceTasks, reference } from "./data/course.js";
+import {
+  codeChecklists,
+  commonMistakes,
+  finalProject,
+  lessons,
+  levels,
+  practiceTasks,
+  projects,
+  promptLibrary
+} from "./data/course.js";
 import "./styles/main.css";
 
-const STORAGE_KEY = "webcoding-platform-state";
+const STORAGE_KEY = "vibe-coding-academy-state";
 
 const defaultState = {
   completedLessons: [],
   completedTasks: [],
   quizScores: {},
+  projectNotes: "",
   agentMessages: [
     {
       role: "agent",
-      text: "Привет! Я локальный AI-агент курса. Могу подобрать следующий урок, объяснить тему, предложить практику или быстро проверить код из мини-редактора."
+      text: "Привет! Я локальный AI-агент Vibe Coding Academy. Я не использую внешние API, но могу помочь по материалам курса: подобрать следующий урок, улучшить промт, разобрать ошибку, дать практику или подготовить план финального проекта."
     }
-  ],
-  code: "",
-  theme: "light"
+  ]
 };
 
-function loadState() {
+function readState() {
   try {
     return { ...defaultState, ...JSON.parse(localStorage.getItem(STORAGE_KEY)) };
   } catch {
@@ -27,157 +35,134 @@ function loadState() {
   }
 }
 
-function saveState(nextState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
-}
-
 function App() {
-  const [state, setState] = useState(loadState);
-  const [activeSection, setActiveSection] = useState("home");
-  const [levelFilter, setLevelFilter] = useState("all");
-  const [query, setQuery] = useState("");
+  const [state, setState] = useState(readState);
+  const [section, setSection] = useState("home");
   const [selectedLessonId, setSelectedLessonId] = useState(lessons[0].id);
+  const [levelFilter, setLevelFilter] = useState("all");
+  const [lessonQuery, setLessonQuery] = useState("");
+  const [promptQuery, setPromptQuery] = useState("");
 
   const selectedLesson = lessons.find((lesson) => lesson.id === selectedLessonId) || lessons[0];
-  const completedSet = new Set(state.completedLessons);
+  const completed = new Set(state.completedLessons);
   const progress = Math.round((state.completedLessons.length / lessons.length) * 100);
 
   const filteredLessons = useMemo(() => {
+    const query = lessonQuery.trim().toLowerCase();
     return lessons.filter((lesson) => {
       const matchesLevel = levelFilter === "all" || lesson.level === levelFilter;
-      const searchText = `${lesson.title} ${lesson.description} ${lesson.theory}`.toLowerCase();
-      return matchesLevel && searchText.includes(query.trim().toLowerCase());
+      const searchable = `${lesson.title} ${lesson.course} ${lesson.goal} ${lesson.theory} ${lesson.aiPrompt}`.toLowerCase();
+      return matchesLevel && searchable.includes(query);
     });
-  }, [levelFilter, query]);
+  }, [levelFilter, lessonQuery]);
 
-  function updateState(patch) {
+  const filteredPrompts = useMemo(() => {
+    const query = promptQuery.trim().toLowerCase();
+    return promptLibrary.filter((prompt) => `${prompt.category} ${prompt.title} ${prompt.text}`.toLowerCase().includes(query));
+  }, [promptQuery]);
+
+  function save(patch) {
     setState((current) => {
       const next = { ...current, ...patch };
-      saveState(next);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   }
 
   function toggleLesson(id) {
-    const exists = state.completedLessons.includes(id);
-    updateState({
-      completedLessons: exists
-        ? state.completedLessons.filter((lessonId) => lessonId !== id)
-        : [...state.completedLessons, id]
-    });
+    const next = completed.has(id)
+      ? state.completedLessons.filter((lessonId) => lessonId !== id)
+      : [...state.completedLessons, id];
+    save({ completedLessons: next });
   }
 
   function toggleTask(title) {
     const exists = state.completedTasks.includes(title);
-    updateState({
-      completedTasks: exists
-        ? state.completedTasks.filter((taskTitle) => taskTitle !== title)
-        : [...state.completedTasks, title]
+    save({
+      completedTasks: exists ? state.completedTasks.filter((task) => task !== title) : [...state.completedTasks, title]
     });
   }
 
-  function setTheme(theme) {
-    document.documentElement.dataset.theme = theme;
-    updateState({ theme });
-  }
-
-  React.useEffect(() => {
-    document.documentElement.dataset.theme = state.theme;
-  }, [state.theme]);
-
-  const sectionMap = {
-    home: <Home progress={progress} setActiveSection={setActiveSection} />,
-    roadmap: <Roadmap progress={progress} />,
+  const screens = {
+    home: <Home progress={progress} onNavigate={setSection} />,
+    dashboard: <Dashboard state={state} progress={progress} />,
+    courses: <Courses completed={completed} onOpenLesson={(id) => { setSelectedLessonId(id); setSection("lessons"); }} />,
     lessons: (
       <Lessons
         lessons={filteredLessons}
         selectedLesson={selectedLesson}
-        completedSet={completedSet}
+        completed={completed}
         levelFilter={levelFilter}
-        query={query}
-        onLevelFilter={setLevelFilter}
-        onQuery={setQuery}
+        lessonQuery={lessonQuery}
+        onFilter={setLevelFilter}
+        onSearch={setLessonQuery}
         onSelect={setSelectedLessonId}
         onToggle={toggleLesson}
-        onQuizScore={(lessonId, score) => updateState({ quizScores: { ...state.quizScores, [lessonId]: score } })}
         score={state.quizScores[selectedLesson.id]}
+        onScore={(score) => save({ quizScores: { ...state.quizScores, [selectedLesson.id]: score } })}
       />
     ),
-    practice: <Practice tasks={practiceTasks} completedTasks={state.completedTasks} onToggle={toggleTask} />,
-    projects: <Projects projects={miniProjects} />,
+    practice: <Practice completedTasks={state.completedTasks} onToggle={toggleTask} />,
     agent: (
       <AIAgent
         messages={state.agentMessages}
         progress={progress}
         state={state}
         selectedLesson={selectedLesson}
-        code={state.code}
-        onMessages={(agentMessages) => updateState({ agentMessages })}
-        onOpenLessons={() => setActiveSection("lessons")}
+        onMessages={(agentMessages) => save({ agentMessages })}
+        onOpenLesson={(id) => {
+          setSelectedLessonId(id);
+          setSection("lessons");
+        }}
       />
     ),
-    tests: <Tests lessons={lessons} scores={state.quizScores} />,
-    progress: <Progress state={state} progress={progress} />,
-    reference: <Reference items={reference} />,
-    finals: <FinalProjects projects={finalProjects} />,
-    senior: <SeniorPath />
+    prompts: <Prompts prompts={filteredPrompts} query={promptQuery} onQuery={setPromptQuery} />,
+    checklists: <Checklists />,
+    tests: <Tests scores={state.quizScores} />,
+    projects: <Projects notes={state.projectNotes} onNotes={(projectNotes) => save({ projectNotes })} />,
+    mistakes: <Mistakes />,
+    final: <FinalProject />
   };
 
   return (
     <div className="app-shell">
-      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
+      <Sidebar active={section} onNavigate={setSection} />
       <main className="workspace">
-        <Topbar theme={state.theme} setTheme={setTheme} progress={progress} />
-        {sectionMap[activeSection]}
-        <CodeEditor value={state.code} onChange={(code) => updateState({ code })} />
+        <Topbar progress={progress} />
+        {screens[section]}
       </main>
     </div>
   );
 }
 
-function Topbar({ theme, setTheme, progress }) {
-  return (
-    <header className="topbar">
-      <div>
-        <span className="eyebrow">Локально. Бесплатно. Без API.</span>
-        <h1>Вебкодинг: от новичка до синьора</h1>
-      </div>
-      <div className="topbar-actions">
-        <div className="compact-progress" aria-label={`Прогресс ${progress}%`}>
-          <span style={{ width: `${progress}%` }} />
-        </div>
-        <button type="button" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
-          {theme === "light" ? "Темная тема" : "Светлая тема"}
-        </button>
-      </div>
-    </header>
-  );
-}
-
-function Sidebar({ activeSection, setActiveSection }) {
+function Sidebar({ active, onNavigate }) {
   const items = [
     ["home", "Главная"],
-    ["roadmap", "Дорожная карта"],
+    ["dashboard", "Дашборд"],
+    ["courses", "Каталог курсов"],
     ["lessons", "Уроки"],
     ["practice", "Практика"],
-    ["projects", "Мини-проекты"],
     ["agent", "AI-агент"],
-    ["tests", "Тесты"],
-    ["progress", "Личный прогресс"],
-    ["reference", "Справочник"],
-    ["finals", "Финальные проекты"],
-    ["senior", "Путь до Senior"]
+    ["prompts", "Промты"],
+    ["checklists", "Чек-листы"],
+    ["tests", "Мини-тесты"],
+    ["projects", "Мои проекты"],
+    ["mistakes", "Типовые ошибки"],
+    ["final", "Финальный проект"]
   ];
 
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-mark">{"</>"}</span>
-        <strong>Вебкодинг</strong>
+        <span className="brand-mark">VC</span>
+        <div>
+          <strong>Vibe Coding Academy</strong>
+          <small>AI-first разработка</small>
+        </div>
       </div>
-      <nav aria-label="Разделы курса">
+      <nav aria-label="Разделы платформы">
         {items.map(([id, label]) => (
-          <button key={id} className={activeSection === id ? "active" : ""} type="button" onClick={() => setActiveSection(id)}>
+          <button className={active === id ? "active" : ""} key={id} type="button" onClick={() => onNavigate(id)}>
             {label}
           </button>
         ))}
@@ -186,171 +171,195 @@ function Sidebar({ activeSection, setActiveSection }) {
   );
 }
 
-function Home({ progress, setActiveSection }) {
+function Topbar({ progress }) {
+  return (
+    <header className="topbar">
+      <div>
+        <span className="eyebrow">Локально. Бесплатно. Без API и базы данных.</span>
+        <h1>Vibe Coding Academy</h1>
+      </div>
+      <div className="progress-widget" aria-label={`Прогресс обучения ${progress}%`}>
+        <strong>{progress}%</strong>
+        <span><i style={{ width: `${progress}%` }} /></span>
+      </div>
+    </header>
+  );
+}
+
+function Home({ progress, onNavigate }) {
   return (
     <section className="home-grid">
       <article className="hero-panel">
-        <span className="eyebrow">Учебная платформа</span>
-        <h2>Учись веб-разработке шаг за шагом, прямо в браузере.</h2>
+        <span className="eyebrow">Путь от новичка до уверенного разработчика</span>
+        <h2>Учись создавать сайты и приложения с ИИ, но понимай, что именно ты строишь.</h2>
         <p>
-          Курс ведет от первой HTML-страницы до архитектуры, React, тестирования, оптимизации и технического лидерства.
-          Все работает локально: уроки лежат в файлах, прогресс сохраняется в localStorage.
+          Платформа ведет по простому маршруту: промты, HTML, CSS, JavaScript, отладка, проекты и финальная работа.
+          Все данные лежат локально, прогресс сохраняется в браузере.
         </p>
-        <div className="hero-actions">
-          <button type="button" onClick={() => setActiveSection("lessons")}>Начать уроки</button>
-          <button type="button" onClick={() => setActiveSection("roadmap")}>Открыть карту</button>
+        <div className="button-row">
+          <button className="primary" type="button" onClick={() => onNavigate("lessons")}>Начать уроки</button>
+          <button type="button" onClick={() => onNavigate("dashboard")}>Открыть дашборд</button>
         </div>
       </article>
-      <article className="visual-panel" aria-label="Учебный интерфейс">
-        <div className="browser-mock">
-          <div className="browser-dots"><span /><span /><span /></div>
-          <pre>{`const path = ["HTML", "CSS", "JS", "React"];
-path.forEach(skill => learn(skill));
-
-if (practice.every(day => day.done)) {
-  level.up("Senior mindset");
-}`}</pre>
-        </div>
+      <article className="learning-map">
+        {levels.map((level, index) => (
+          <div key={level.id}>
+            <span>{index + 1}</span>
+            <h3>{level.label}</h3>
+            <p>{level.description}</p>
+          </div>
+        ))}
       </article>
-      <Metric label="Всего прогресс" value={`${progress}%`} />
+      <Metric label="Общий прогресс" value={`${progress}%`} />
       <Metric label="Уроков" value={lessons.length} />
-      <Metric label="Мини-проектов" value={miniProjects.length} />
-      <Metric label="Уровней" value={levels.length} />
+      <Metric label="Практик" value={practiceTasks.length} />
+      <Metric label="Промтов" value={promptLibrary.length} />
     </section>
   );
 }
 
-function Metric({ label, value }) {
+function Dashboard({ state, progress }) {
+  const nextLesson = lessons.find((lesson) => !state.completedLessons.includes(lesson.id)) || lessons.at(-1);
   return (
-    <article className="metric">
-      <strong>{value}</strong>
-      <span>{label}</span>
-    </article>
+    <section className="section">
+      <SectionTitle kicker="Дашборд ученика" title="Твой учебный маршрут" />
+      <div className="metric-grid">
+        <Metric label="Пройдено уроков" value={`${state.completedLessons.length}/${lessons.length}`} />
+        <Metric label="Практик закрыто" value={`${state.completedTasks.length}/${practiceTasks.length}`} />
+        <Metric label="Тестов решено" value={Object.keys(state.quizScores).length} />
+        <Metric label="Прогресс" value={`${progress}%`} />
+      </div>
+      <article className="next-card">
+        <span className="eyebrow">Следующий разумный шаг</span>
+        <h3>{nextLesson.title}</h3>
+        <p>{nextLesson.goal}</p>
+      </article>
+    </section>
   );
 }
 
-function Roadmap({ progress }) {
+function Courses({ completed, onOpenLesson }) {
   return (
     <section className="section">
-      <SectionTitle kicker="Дорожная карта" title="От первой страницы до инженерного мышления" />
-      <div className="roadmap">
-        {levels.map((level, index) => (
-          <article key={level.id}>
-            <span className="step">{index + 1}</span>
-            <h3>{level.title}</h3>
-            <p>{level.focus}</p>
-            <ul>{level.skills.map((skill) => <li key={skill}>{skill}</li>)}</ul>
+      <SectionTitle kicker="Каталог курсов" title="10 тем, которые собираются в один практический путь" />
+      <div className="course-grid">
+        {lessons.map((lesson, index) => (
+          <article key={lesson.id}>
+            <span>{String(index + 1).padStart(2, "0")} · {levelLabel(lesson.level)}</span>
+            <h3>{lesson.course}</h3>
+            <p>{lesson.goal}</p>
+            <button type="button" onClick={() => onOpenLesson(lesson.id)}>
+              {completed.has(lesson.id) ? "Повторить" : "Открыть"}
+            </button>
           </article>
         ))}
-      </div>
-      <div className="progress-card">
-        <strong>{progress}%</strong>
-        <p>Твой общий прогресс по урокам. Завершай уроки и возвращайся к карте, чтобы видеть следующий этап.</p>
       </div>
     </section>
   );
 }
 
 function Lessons(props) {
-  const { lessons, selectedLesson, completedSet, levelFilter, query, onLevelFilter, onQuery, onSelect, onToggle, onQuizScore, score } = props;
-
+  const { lessons: visibleLessons, selectedLesson, completed, levelFilter, lessonQuery, onFilter, onSearch, onSelect, onToggle, score, onScore } = props;
   return (
-    <section className="section lessons-layout">
-      <div className="lesson-list-panel">
+    <section className="lessons-layout">
+      <aside className="lesson-panel">
         <SectionTitle kicker="Уроки" title="Выбери тему" />
         <div className="filters">
-          <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Поиск по урокам" />
-          <select value={levelFilter} onChange={(event) => onLevelFilter(event.target.value)} aria-label="Фильтр уровня">
+          <input value={lessonQuery} onChange={(event) => onSearch(event.target.value)} placeholder="Поиск по урокам и промтам" />
+          <select value={levelFilter} onChange={(event) => onFilter(event.target.value)} aria-label="Фильтр уровня">
             <option value="all">Все уровни</option>
-            {levels.map((level) => <option key={level.id} value={level.id}>{level.short}</option>)}
+            {levels.map((level) => <option key={level.id} value={level.id}>{level.label}</option>)}
           </select>
         </div>
         <div className="lesson-list">
-          {lessons.map((lesson) => (
-            <button key={lesson.id} type="button" className={selectedLesson.id === lesson.id ? "lesson-card active" : "lesson-card"} onClick={() => onSelect(lesson.id)}>
-              <span>{levels.find((level) => level.id === lesson.level)?.short}</span>
+          {visibleLessons.map((lesson) => (
+            <button className={selectedLesson.id === lesson.id ? "lesson-card active" : "lesson-card"} key={lesson.id} type="button" onClick={() => onSelect(lesson.id)}>
+              <span>{levelLabel(lesson.level)}</span>
               <strong>{lesson.title}</strong>
-              <small>{completedSet.has(lesson.id) ? "Пройден" : lesson.duration}</small>
+              <small>{completed.has(lesson.id) ? "Завершен" : lesson.course}</small>
             </button>
           ))}
         </div>
-      </div>
-      <LessonReader lesson={selectedLesson} done={completedSet.has(selectedLesson.id)} onToggle={onToggle} onQuizScore={onQuizScore} score={score} />
+      </aside>
+      <LessonReader lesson={selectedLesson} done={completed.has(selectedLesson.id)} onToggle={onToggle} score={score} onScore={onScore} />
     </section>
   );
 }
 
-function LessonReader({ lesson, done, onToggle, onQuizScore, score }) {
+function LessonReader({ lesson, done, onToggle, score, onScore }) {
   return (
     <article className="reader">
       <div className="reader-head">
         <div>
-          <span className="eyebrow">{levels.find((level) => level.id === lesson.level)?.title}</span>
+          <span className="eyebrow">{lesson.course} · {levelLabel(lesson.level)}</span>
           <h2>{lesson.title}</h2>
-          <p>{lesson.description}</p>
+          <p>{lesson.goal}</p>
         </div>
-        <button type="button" className={done ? "success" : ""} onClick={() => onToggle(lesson.id)}>
-          {done ? "Урок пройден" : "Отметить пройденным"}
+        <button className={done ? "success" : "primary"} type="button" onClick={() => onToggle(lesson.id)}>
+          {done ? "Урок завершен" : "Отметить завершенным"}
         </button>
       </div>
-      <h3>Теория</h3>
-      <p>{lesson.theory}</p>
-      <h3>Пример кода</h3>
-      <pre className="code-block">{lesson.code}</pre>
-      <h3>Практическое задание</h3>
-      <p className="task-box">{lesson.practice}</p>
-      <Quiz lesson={lesson} onQuizScore={onQuizScore} savedScore={score} />
+      <ContentBlock title="Краткая теория">{lesson.theory}</ContentBlock>
+      <ContentBlock title="Пример промта для ИИ">
+        <pre className="prompt-box">{lesson.aiPrompt}</pre>
+      </ContentBlock>
+      <ContentBlock title="Пример кода">
+        <pre className="code-block">{lesson.code}</pre>
+      </ContentBlock>
+      <ContentBlock title="Практическое задание">{lesson.practice}</ContentBlock>
+      <ContentBlock title="Чек-лист проверки">
+        <Checklist items={lesson.checklist} />
+      </ContentBlock>
+      <Quiz lesson={lesson} score={score} onScore={onScore} />
     </article>
   );
 }
 
-function Quiz({ lesson, onQuizScore, savedScore }) {
+function Quiz({ lesson, score, onScore }) {
   const [answers, setAnswers] = useState({});
-  const [result, setResult] = useState(savedScore);
 
-  function check() {
-    const correct = lesson.quiz.reduce((sum, question, index) => sum + (Number(answers[index]) === question.answer ? 1 : 0), 0);
-    setResult(correct);
-    onQuizScore(lesson.id, correct);
+  function checkQuiz() {
+    const result = lesson.quiz.reduce((sum, item, index) => sum + (Number(answers[index]) === item.answer ? 1 : 0), 0);
+    onScore(result);
   }
 
   return (
-    <div className="quiz">
-      <h3>Тест</h3>
-      {lesson.quiz.map((question, index) => (
-        <fieldset key={question.question}>
-          <legend>{question.question}</legend>
-          {question.options.map((option, optionIndex) => (
-            <label key={option}>
-              <input
-                type="radio"
-                name={`${lesson.id}-${index}`}
-                value={optionIndex}
-                checked={Number(answers[index]) === optionIndex}
-                onChange={(event) => setAnswers({ ...answers, [index]: event.target.value })}
-              />
-              {option}
-            </label>
-          ))}
-        </fieldset>
-      ))}
-      <button type="button" onClick={check}>Проверить ответы</button>
-      {result !== undefined && <p className="quiz-result">Результат: {result} из {lesson.quiz.length}</p>}
-    </div>
+    <ContentBlock title="Мини-тест">
+      <div className="quiz">
+        {lesson.quiz.map((item, index) => (
+          <fieldset key={item.text}>
+            <legend>{item.text}</legend>
+            {item.options.map((option, optionIndex) => (
+              <label key={option}>
+                <input
+                  type="radio"
+                  name={`${lesson.id}-${index}`}
+                  checked={Number(answers[index]) === optionIndex}
+                  onChange={() => setAnswers({ ...answers, [index]: optionIndex })}
+                />
+                {option}
+              </label>
+            ))}
+          </fieldset>
+        ))}
+        <button className="primary" type="button" onClick={checkQuiz}>Проверить ответы</button>
+        {score !== undefined && <p className="quiz-result">Результат: {score} из {lesson.quiz.length}</p>}
+      </div>
+    </ContentBlock>
   );
 }
 
-function Practice({ tasks, completedTasks, onToggle }) {
+function Practice({ completedTasks, onToggle }) {
   return (
     <section className="section">
-      <SectionTitle kicker="Практические задания" title="Тренируй навык руками" />
+      <SectionTitle kicker="Практические задания" title="Закрепляй навык руками" />
       <div className="task-grid">
-        {tasks.map((task) => (
-          <label key={task.title} className="task-card">
+        {practiceTasks.map((task) => (
+          <label className="task-card" key={task.title}>
             <input type="checkbox" checked={completedTasks.includes(task.title)} onChange={() => onToggle(task.title)} />
             <span>
               <strong>{task.title}</strong>
-              <small>{levels.find((level) => level.id === task.level)?.short}</small>
+              <small>{levelLabel(task.level)}</small>
               <p>{task.text}</p>
             </span>
           </label>
@@ -360,99 +369,15 @@ function Practice({ tasks, completedTasks, onToggle }) {
   );
 }
 
-function Projects({ projects }) {
-  return (
-    <section className="section">
-      <SectionTitle kicker="Мини-проекты" title="Проекты для портфолио и закрепления" />
-      <div className="project-grid">
-        {projects.map((project) => (
-          <article key={project.id}>
-            <span>{project.stack}</span>
-            <h3>{project.title}</h3>
-            <ol>{project.steps.map((step) => <li key={step}>{step}</li>)}</ol>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function normalizeText(value) {
-  return value.toLowerCase().replace(/ё/g, "е");
-}
-
-function findRelevantLesson(message) {
-  const query = normalizeText(message);
-  return lessons.find((lesson) => {
-    const text = normalizeText(`${lesson.title} ${lesson.description} ${lesson.theory} ${lesson.practice}`);
-    return query.split(/\s+/).filter((word) => word.length > 3).some((word) => text.includes(word));
-  });
-}
-
-function getNextLesson(state) {
-  return lessons.find((lesson) => !state.completedLessons.includes(lesson.id)) || lessons[lessons.length - 1];
-}
-
-function analyzeCode(code) {
-  const source = code.trim();
-  const tips = [];
-
-  if (!source) {
-    return ["Редактор пустой. Начни с простого блока: h1, p и button."];
-  }
-
-  if (!/<h1|<h2|<h3/i.test(source)) tips.push("Добавь заголовок h1-h3, чтобы у страницы была понятная структура.");
-  if (!/<main|<section|<article|<header|<footer/i.test(source)) tips.push("Попробуй семантические теги: main, section, article, header или footer.");
-  if (/<button/i.test(source) && !/addEventListener|onclick/i.test(source)) tips.push("Кнопка есть, но поведения нет. Добавь addEventListener или обработчик onclick.");
-  if (/<img/i.test(source) && !/alt=/i.test(source)) tips.push("У img нужен alt, это базовая доступность.");
-  if (/<style/i.test(source) && !/display:\s*(grid|flex)/i.test(source)) tips.push("Для макета попробуй flex или grid вместо случайных отступов.");
-  if (/localStorage/i.test(source) && !/JSON\.(stringify|parse)/i.test(source)) tips.push("Если сохраняешь объекты в localStorage, используй JSON.stringify и JSON.parse.");
-  if (!tips.length) tips.push("Хорошее начало: структура читается. Следующий шаг - проверь адаптивность и состояния кнопок.");
-
-  return tips;
-}
-
-function generateAgentReply(message, context) {
-  const text = normalizeText(message);
-  const nextLesson = getNextLesson(context.state);
-  const relevantLesson = findRelevantLesson(message) || context.selectedLesson;
-
-  if (text.includes("код") || text.includes("проверь") || text.includes("ошиб")) {
-    return `Проверил код из мини-редактора. ${analyzeCode(context.code).join(" ")} Для закрепления открой урок «${relevantLesson.title}» и сравни свой код с примером.`;
-  }
-
-  if (text.includes("след") || text.includes("что учить") || text.includes("план") || text.includes("маршрут")) {
-    return `Твой прогресс: ${context.progress}%. Следующий разумный шаг - урок «${nextLesson.title}». После него сделай практику: ${nextLesson.practice}`;
-  }
-
-  if (text.includes("практи") || text.includes("задан") || text.includes("проект")) {
-    const task = practiceTasks.find((item) => !context.state.completedTasks.includes(item.title)) || practiceTasks[0];
-    return `Предлагаю практику: «${task.title}». ${task.text} Когда закончишь, отметь задание в разделе «Практика».`;
-  }
-
-  if (text.includes("тест") || text.includes("вопрос")) {
-    return `Начни с теста к уроку «${relevantLesson.title}». В нем ${relevantLesson.quiz.length} вопроса. Если ошибешься, перечитай теорию и пример кода, а потом повтори попытку.`;
-  }
-
-  if (text.includes("html") || text.includes("css") || text.includes("javascript") || text.includes("js") || text.includes("react")) {
-    return `По твоему вопросу ближе всего урок «${relevantLesson.title}». Коротко: ${relevantLesson.description} Практический шаг: ${relevantLesson.practice}`;
-  }
-
-  if (text.includes("senior") || text.includes("синьор") || text.includes("архитект")) {
-    return "Путь до Senior - это не только React. Держи фокус на архитектуре, доступности, производительности, безопасности, тестах и code review. Для тренировки возьми один мини-проект и опиши его требования, риски и критерии качества.";
-  }
-
-  return `Я понял запрос. Мой совет: открой урок «${nextLesson.title}», сделай практику и затем попроси меня проверить код. Я работаю локально и использую только данные этой платформы.`;
-}
-
-function AIAgent({ messages, progress, state, selectedLesson, code, onMessages, onOpenLessons }) {
+function AIAgent({ messages, progress, state, selectedLesson, onMessages, onOpenLesson }) {
   const [draft, setDraft] = useState("");
+  const nextLesson = getNextLesson(state);
   const quickPrompts = [
     "Что учить дальше?",
-    "Проверь мой код",
+    "Помоги написать промт",
+    "Как исправлять ошибки?",
     "Дай практическое задание",
-    "Объясни HTML",
-    "Как расти до Senior?"
+    "План финального проекта"
   ];
 
   function sendMessage(text = draft) {
@@ -462,9 +387,10 @@ function AIAgent({ messages, progress, state, selectedLesson, code, onMessages, 
     const userMessage = { role: "user", text: cleanText };
     const agentMessage = {
       role: "agent",
-      text: generateAgentReply(cleanText, { progress, state, selectedLesson, code })
+      text: generateAgentReply(cleanText, { progress, state, selectedLesson, nextLesson })
     };
-    onMessages([...messages, userMessage, agentMessage]);
+
+    onMessages([...(messages || defaultState.agentMessages), userMessage, agentMessage]);
     setDraft("");
   }
 
@@ -474,24 +400,32 @@ function AIAgent({ messages, progress, state, selectedLesson, code, onMessages, 
 
   return (
     <section className="section agent-section">
-      <SectionTitle kicker="AI-агент" title="Локальный наставник по веб-разработке" />
+      <SectionTitle kicker="Локальный AI-агент" title="Наставник по vibe coding без внешних API" />
       <div className="agent-layout">
-        <article className="agent-card">
-          <div className="agent-avatar">AI</div>
+        <article className="agent-summary">
+          <span className="agent-avatar">AI</span>
           <h3>Что умеет агент</h3>
-          <p>Подбирает следующий урок, объясняет темы курса, предлагает практику и анализирует код из мини-редактора. Все работает в браузере: без платных API, облака и внешней базы.</p>
-          <div className="agent-facts">
-            <span>Локально</span>
-            <span>Без API</span>
-            <span>localStorage</span>
+          <p>
+            Он работает на правилах и данных курса: анализирует твой прогресс, текущий урок, практики и типовые ошибки.
+            Это не подключение к облачной модели, а безопасный локальный помощник для обучения.
+          </p>
+          <div className="agent-stats">
+            <span>{progress}% прогресс</span>
+            <span>{state.completedLessons.length}/{lessons.length} уроков</span>
+            <span>{Object.keys(state.quizScores).length} тестов</span>
           </div>
-          <button type="button" onClick={onOpenLessons}>Открыть уроки</button>
+          <div className="next-card compact">
+            <span className="eyebrow">Рекомендация</span>
+            <h3>{nextLesson.title}</h3>
+            <p>{nextLesson.goal}</p>
+            <button type="button" className="primary" onClick={() => onOpenLesson(nextLesson.id)}>Открыть урок</button>
+          </div>
         </article>
 
         <article className="agent-chat">
           <div className="agent-messages" aria-live="polite">
-            {messages.map((message, index) => (
-              <div key={`${message.role}-${index}`} className={`agent-message ${message.role}`}>
+            {(messages || defaultState.agentMessages).map((message, index) => (
+              <div className={`agent-message ${message.role}`} key={`${message.role}-${index}`}>
                 <span>{message.role === "agent" ? "AI-агент" : "Вы"}</span>
                 <p>{message.text}</p>
               </div>
@@ -499,7 +433,7 @@ function AIAgent({ messages, progress, state, selectedLesson, code, onMessages, 
           </div>
           <div className="agent-prompts">
             {quickPrompts.map((prompt) => (
-              <button key={prompt} type="button" onClick={() => sendMessage(prompt)}>{prompt}</button>
+              <button type="button" key={prompt} onClick={() => sendMessage(prompt)}>{prompt}</button>
             ))}
           </div>
           <form
@@ -509,8 +443,12 @@ function AIAgent({ messages, progress, state, selectedLesson, code, onMessages, 
               sendMessage();
             }}
           >
-            <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Спроси: что учить дальше, проверь код, дай практику..." />
-            <button type="submit">Спросить</button>
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Спроси про промт, ошибку, практику, следующий урок или финальный проект"
+            />
+            <button className="primary" type="submit">Спросить</button>
             <button type="button" onClick={resetChat}>Очистить</button>
           </form>
         </article>
@@ -519,10 +457,102 @@ function AIAgent({ messages, progress, state, selectedLesson, code, onMessages, 
   );
 }
 
-function Tests({ lessons, scores }) {
+function normalizeText(value) {
+  return value.toLowerCase().replaceAll("ё", "е");
+}
+
+function getNextLesson(state) {
+  return lessons.find((lesson) => !state.completedLessons.includes(lesson.id)) || lessons[lessons.length - 1];
+}
+
+function findRelevantLesson(message, fallbackLesson) {
+  const queryWords = normalizeText(message).split(/\s+/).filter((word) => word.length > 3);
+  return lessons.find((lesson) => {
+    const text = normalizeText(`${lesson.title} ${lesson.course} ${lesson.goal} ${lesson.theory} ${lesson.aiPrompt}`);
+    return queryWords.some((word) => text.includes(word));
+  }) || fallbackLesson;
+}
+
+function generateAgentReply(message, context) {
+  const text = normalizeText(message);
+  const relevantLesson = findRelevantLesson(message, context.selectedLesson);
+  const unfinishedTask = practiceTasks.find((task) => !context.state.completedTasks.includes(task.title)) || practiceTasks[0];
+  const bestPrompt = promptLibrary.find((prompt) => {
+    const source = normalizeText(`${prompt.category} ${prompt.title} ${prompt.text}`);
+    return text.split(/\s+/).some((word) => word.length > 3 && source.includes(word));
+  }) || promptLibrary[0];
+
+  if (text.includes("дальше") || text.includes("след") || text.includes("маршрут") || text.includes("учить")) {
+    return `Сейчас прогресс ${context.progress}%. Следующий полезный шаг - урок «${context.nextLesson.title}». Цель: ${context.nextLesson.goal} После него сделай практику: ${context.nextLesson.practice}`;
+  }
+
+  if (text.includes("промт") || text.includes("prompt") || text.includes("запрос")) {
+    return `Возьми структуру: роль + цель + контекст + ограничения + формат результата + критерии проверки. Для твоей темы подойдет такой старт: «${relevantLesson.aiPrompt}». Еще полезный шаблон из библиотеки: «${bestPrompt.text}»`;
+  }
+
+  if (text.includes("ошиб") || text.includes("баг") || text.includes("не работает") || text.includes("слом")) {
+    return "Иди по спокойному алгоритму: 1. Воспроизведи ошибку. 2. Скопируй первое сообщение из консоли. 3. Опиши, что ожидалось и что получилось. 4. Попроси ИИ минимальное исправление, а не переписывание всего проекта. Частая проверка: селектор нашел элемент, скрипт подключен после HTML, localStorage читается с запасным значением.";
+  }
+
+  if (text.includes("практик") || text.includes("задани") || text.includes("трен")) {
+    return `Практика на сейчас: «${unfinishedTask.title}». ${unfinishedTask.text} Критерий готовности: результат можно открыть в браузере, проверить по чек-листу и объяснить своими словами.`;
+  }
+
+  if (text.includes("финал") || text.includes("проект")) {
+    return `Финальный проект лучше вести в 6 шагов: 1. Описать пользователя и цель. 2. Выбрать экраны. 3. Подготовить локальные данные. 4. Собрать интерфейс. 5. Добавить localStorage. 6. Проверить по README и чек-листам. Тема из курса: «${finalProject.title}».`;
+  }
+
+  if (text.includes("html") || text.includes("css") || text.includes("javascript") || text.includes("js")) {
+    return `По этому вопросу ближе всего урок «${relevantLesson.title}». Главное в нем: ${relevantLesson.goal} Начни с примера кода, затем выполни практику: ${relevantLesson.practice}`;
+  }
+
+  if (text.includes("ревью") || text.includes("проверь") || text.includes("качество")) {
+    return "Для ревью проверь 4 слоя: HTML-семантика, CSS-адаптивность, JS-ошибки в консоли и качество промта. Если хочешь, пришли в заметки проекта список проблем, а потом спроси меня: «как улучшить ревью проекта».";
+  }
+
+  return `Я бы начал с урока «${context.nextLesson.title}»: ${context.nextLesson.goal} Если хочешь точнее, спроси меня одним из форматов: «помоги с промтом», «дай практику», «как исправить ошибку» или «план финального проекта».`;
+}
+
+function Prompts({ prompts, query, onQuery }) {
   return (
     <section className="section">
-      <SectionTitle kicker="Тесты" title="Контрольные точки по каждому уроку" />
+      <SectionTitle kicker="Библиотека промтов" title="Готовые формулировки для AI-first работы" />
+      <div className="filters single">
+        <input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Поиск по промтам" />
+      </div>
+      <div className="prompt-grid">
+        {prompts.map((prompt) => (
+          <article key={prompt.title}>
+            <span>{prompt.category}</span>
+            <h3>{prompt.title}</h3>
+            <p>{prompt.text}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Checklists() {
+  return (
+    <section className="section">
+      <SectionTitle kicker="Чек-листы проверки кода" title="Перед тем как считать задачу готовой" />
+      <div className="checklist-grid">
+        {codeChecklists.map((group) => (
+          <article key={group.title}>
+            <h3>{group.title}</h3>
+            <Checklist items={group.items} />
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Tests({ scores }) {
+  return (
+    <section className="section">
+      <SectionTitle kicker="Мини-тесты" title="Быстрая проверка понимания" />
       <div className="table-list">
         {lessons.map((lesson) => (
           <article key={lesson.id}>
@@ -535,31 +565,36 @@ function Tests({ lessons, scores }) {
   );
 }
 
-function Progress({ state, progress }) {
+function Projects({ notes, onNotes }) {
   return (
     <section className="section">
-      <SectionTitle kicker="Личный прогресс" title="Что уже сделано" />
-      <div className="progress-dashboard">
-        <Metric label="Уроков пройдено" value={`${state.completedLessons.length}/${lessons.length}`} />
-        <Metric label="Практик закрыто" value={`${state.completedTasks.length}/${practiceTasks.length}`} />
-        <Metric label="Тестов решено" value={Object.keys(state.quizScores).length} />
-        <Metric label="Общий прогресс" value={`${progress}%`} />
+      <SectionTitle kicker="Мои проекты" title="Учебное портфолио и заметки" />
+      <div className="project-grid">
+        {projects.map((project) => (
+          <article key={project.title}>
+            <span>{project.status} · {project.stack}</span>
+            <h3>{project.title}</h3>
+            <p>{project.goal}</p>
+          </article>
+        ))}
       </div>
-      <div className="wide-progress"><span style={{ width: `${progress}%` }} /></div>
+      <label className="notes">
+        <span>Заметки по своим проектам</span>
+        <textarea value={notes} onChange={(event) => onNotes(event.target.value)} placeholder="Например: что хочу собрать, какие промты сработали, какие ошибки нашел..." />
+      </label>
     </section>
   );
 }
 
-function Reference({ items }) {
+function Mistakes() {
   return (
     <section className="section">
-      <SectionTitle kicker="Справочник HTML/CSS/JS" title="Короткие подсказки рядом с практикой" />
-      <div className="reference-grid">
-        {items.map((item) => (
-          <article key={`${item.area}-${item.title}`}>
-            <span>{item.area}</span>
-            <h3>{item.title}</h3>
-            <p>{item.body}</p>
+      <SectionTitle kicker="Типовые ошибки" title="Что чаще всего мешает новичку" />
+      <div className="mistake-list">
+        {commonMistakes.map((mistake) => (
+          <article key={mistake.title}>
+            <h3>{mistake.title}</h3>
+            <p>{mistake.fix}</p>
           </article>
         ))}
       </div>
@@ -567,51 +602,48 @@ function Reference({ items }) {
   );
 }
 
-function FinalProjects({ projects }) {
+function FinalProject() {
   return (
-    <section className="section">
-      <SectionTitle kicker="Финальные проекты" title="Собери большой результат" />
-      <div className="final-list">
-        {projects.map((project, index) => (
-          <article key={project}>
-            <span>{String(index + 1).padStart(2, "0")}</span>
-            <h3>{project}</h3>
-            <p>Опиши требования, сделай макет, разбей на компоненты, добавь localStorage, тест-кейсы и финальный review.</p>
-          </article>
-        ))}
+    <section className="section final-project">
+      <SectionTitle kicker="Финальный проект" title={finalProject.title} />
+      <p>{finalProject.brief}</p>
+      <div className="final-columns">
+        <article>
+          <h3>Что сдать</h3>
+          <Checklist items={finalProject.deliverables} />
+        </article>
+        <article>
+          <h3>Критерии готовности</h3>
+          <Checklist items={finalProject.acceptance} />
+        </article>
       </div>
     </section>
   );
 }
 
-function SeniorPath() {
+function ContentBlock({ title, children }) {
   return (
-    <section className="section">
-      <SectionTitle kicker="Путь до Senior" title="Не только код, но и инженерные решения" />
-      <div className="senior-grid">
-        {["Чистая архитектура", "Проектирование интерфейсов", "Оптимизация", "Безопасность", "Тестирование", "Code review", "Техническое лидерство", "Коммуникация решений"].map((item) => (
-          <article key={item}>
-            <h3>{item}</h3>
-            <p>Сформулируй критерии качества, риски, компромиссы и способ проверки результата.</p>
-          </article>
-        ))}
-      </div>
+    <section className="content-block">
+      <h3>{title}</h3>
+      {typeof children === "string" ? <p>{children}</p> : children}
     </section>
   );
 }
 
-function CodeEditor({ value, onChange }) {
-  const starterCode = "<h1>Мой код</h1>\n<p>Измени HTML слева и посмотри результат.</p>\n<button>Кнопка</button>";
-  const code = value || starterCode;
-
+function Checklist({ items }) {
   return (
-    <section className="section editor-section">
-      <SectionTitle kicker="Мини-редактор" title="Песочница HTML/CSS/JS" />
-      <div className="editor-grid">
-        <textarea value={code} onChange={(event) => onChange(event.target.value)} spellCheck="false" aria-label="Редактор кода" />
-        <iframe title="Предпросмотр кода" srcDoc={code} sandbox="allow-scripts" />
-      </div>
-    </section>
+    <ul className="checklist">
+      {items.map((item) => <li key={item}>{item}</li>)}
+    </ul>
+  );
+}
+
+function Metric({ label, value }) {
+  return (
+    <article className="metric">
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </article>
   );
 }
 
@@ -622,6 +654,10 @@ function SectionTitle({ kicker, title }) {
       <h2>{title}</h2>
     </div>
   );
+}
+
+function levelLabel(levelId) {
+  return levels.find((level) => level.id === levelId)?.label || levelId;
 }
 
 createRoot(document.getElementById("root")).render(<App />);
